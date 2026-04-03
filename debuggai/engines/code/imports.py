@@ -101,17 +101,29 @@ def _is_hallucinated_python(
         return False
     if module in installed:
         return False
-    # Check if it's a local module (relative to project)
+
+    # Check if it's a local module (relative to project dir and parents)
+    dirs_to_check = []
     if project_dir:
-        local_path = Path(project_dir) / module
-        local_init = Path(project_dir) / module / "__init__.py"
-        local_file = Path(project_dir) / f"{module}.py"
+        dirs_to_check.append(Path(project_dir))
+        dirs_to_check.append(Path(project_dir).parent)  # Check parent (for package imports)
+    dirs_to_check.append(Path(source_file).parent)
+
+    for check_dir in dirs_to_check:
+        local_path = check_dir / module
+        local_init = check_dir / module / "__init__.py"
+        local_file = check_dir / f"{module}.py"
         if local_path.exists() or local_init.exists() or local_file.exists():
             return False
-    # Check relative to file
-    file_dir = Path(source_file).parent
-    if (file_dir / module).exists() or (file_dir / f"{module}.py").exists():
-        return False
+
+    # Check if importable (catches pip -e installed packages)
+    try:
+        import importlib.util
+        if importlib.util.find_spec(module) is not None:
+            return False
+    except (ModuleNotFoundError, ValueError):
+        pass
+
     return True
 
 

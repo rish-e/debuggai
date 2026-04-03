@@ -1,0 +1,25 @@
+{
+  "name": "debuggai-mcp",
+  "version": "0.1.0",
+  "description": "DebuggAI MCP Server — AI code quality analysis for Claude Code, Cursor, and Windsurf",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "debuggai-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "keywords": ["mcp", "debuggai", "ai", "testing", "code-quality"],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "tsx": "^4.0.0",
+    "@types/node": "^22.0.0"
+  }
+}

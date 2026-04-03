@@ -157,6 +157,12 @@ def scan_security(file_path: str, content: str) -> list[Issue]:
         stripped = line.strip()
         if stripped.startswith("#") or stripped.startswith("//") or stripped.startswith("*"):
             continue
+        # Skip lines that are regex/pattern definitions or string literals (avoid self-detection)
+        if "re.compile" in stripped or "Pattern" in stripped:
+            continue
+        # Skip lines that are just string literals (descriptions, error messages)
+        if stripped.startswith('"') or stripped.startswith("'") or stripped.startswith('"""') or stripped.startswith("f'"):
+            continue
 
         for pattern, severity, title, desc, suggestion, rule_id in patterns:
             if pattern.search(line):
