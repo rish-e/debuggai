@@ -24,7 +24,7 @@ ALWAYS_IGNORE_DIRS = {
     "node_modules", "__pycache__", ".venv", "venv", ".git",
     ".vercel", ".next", ".nuxt", ".output",
     "dist", "build", "out", ".cache",
-    "vendor", "third_party", "third-party",
+    "vendor", "third_party", "third-party", "browser-profile",
     ".tox", ".mypy_cache", ".ruff_cache", ".pytest_cache",
     "coverage", ".nyc_output",
     "eggs", "*.egg-info",

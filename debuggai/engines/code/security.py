@@ -178,6 +178,22 @@ def scan_security(file_path: str, content: str) -> list[Issue]:
                     ]):
                         continue
 
+                # Skip SQL injection when the query uses ? placeholders for values
+                # (f-strings for column/table names with ? for values is safe)
+                if rule_id in ("sql-injection", "sql-injection-js"):
+                    nearby_block = "\n".join(lines[max(0, line_num - 25):min(len(lines), line_num + 10)])
+                    # Safe: f-string for structure but ? for values
+                    if "?" in nearby_block and ("placeholders" in nearby_block or
+                        "params" in nearby_block or ", vals" in nearby_block or
+                        ", params" in nearby_block or "VALUES (" in nearby_block.upper()):
+                        continue
+                    # Safe: only interpolating table/column names from a hardcoded loop
+                    if "for table in" in nearby_block or "for col in" in nearby_block:
+                        continue
+                    # Safe: column name toggle (col = "x" if cond else "y")
+                    if re.search(r'col\s*=\s*["\']', nearby_block):
+                        continue
+
                 # Avoid duplicate issues on the same line with the same rule
                 issue_id = f"sec-{rule_id}-{file_path}:{line_num}"
                 if not any(i.id == issue_id for i in issues):
