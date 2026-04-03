@@ -1,0 +1,182 @@
+"""Main code scanning orchestrator — coordinates all code analysis engines."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Optional
+
+from debuggai.config import DebuggAIConfig
+from debuggai.engines.code.imports import scan_imports
+from debuggai.engines.code.performance import scan_performance
+from debuggai.engines.code.security import scan_security
+from debuggai.engines.code.llm_review import review_with_llm
+from debuggai.models.issues import Issue, Severity
+from debuggai.utils.git import FileDiff
+
+
+SUPPORTED_EXTENSIONS = {
+    ".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs",
+    ".go", ".rs", ".java", ".rb", ".php", ".swift", ".kt",
+}
+
+
+def scan_file(
+    file_path: str,
+    content: str,
+    config: DebuggAIConfig,
+    project_dir: Optional[str] = None,
+    use_llm: bool = True,
+) -> list[Issue]:
+    """Run all code analysis engines on a single file."""
+    ext = Path(file_path).suffix.lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        return []
+
+    issues: list[Issue] = []
+
+    # 1. Hallucinated import detection (fast, no LLM)
+    if config.code.rules.get("ai_patterns", True):
+        issues.extend(scan_imports(file_path, content, project_dir))
+
+    # 2. Security scanning (fast, regex + AST)
+    if config.code.rules.get("security", True):
+        issues.extend(scan_security(file_path, content))
+
+    # 3. Performance analysis (fast, AST-based)
+    if config.code.rules.get("performance", True):
+        issues.extend(scan_performance(file_path, content))
+
+    # 4. LLM-powered semantic review (slow, requires API key)
+    if use_llm and config.anthropic_api_key:
+        context = f"Project: {config.project_name or 'unknown'}, Type: {config.project_type}"
+        issues.extend(review_with_llm(
+            file_path, content,
+            context=context,
+            api_key=config.anthropic_api_key,
+        ))
+
+    # Filter by strictness
+    issues = _filter_by_strictness(issues, config.code.strictness)
+
+    # Deduplicate
+    issues = _deduplicate(issues)
+
+    return issues
+
+
+def scan_files(
+    files: list[FileDiff],
+    config: DebuggAIConfig,
+    project_dir: Optional[str] = None,
+    use_llm: bool = True,
+) -> list[Issue]:
+    """Scan multiple changed files."""
+    all_issues: list[Issue] = []
+
+    for file_diff in files:
+        if file_diff.status == "D":
+            continue  # Skip deleted files
+
+        # Check ignore patterns
+        if _should_ignore(file_diff.path, config.code.ignore):
+            continue
+
+        # Read file content
+        if file_diff.content:
+            content = file_diff.content
+        else:
+            full_path = Path(project_dir or ".") / file_diff.path
+            if full_path.exists():
+                content = full_path.read_text()
+            else:
+                continue
+
+        file_issues = scan_file(
+            file_diff.path, content, config,
+            project_dir=project_dir,
+            use_llm=use_llm,
+        )
+        all_issues.extend(file_issues)
+
+    return sorted(all_issues, key=lambda i: (
+        {"critical": 0, "major": 1, "minor": 2, "info": 3}[i.severity.value],
+        i.location.file if i.location else "",
+        i.location.line if i.location else 0,
+    ))
+
+
+def scan_directory(
+    directory: str,
+    config: DebuggAIConfig,
+    use_llm: bool = True,
+) -> list[Issue]:
+    """Scan all supported files in a directory."""
+    all_issues: list[Issue] = []
+    root = Path(directory)
+
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            continue
+
+        rel_path = str(path.relative_to(root))
+
+        if _should_ignore(rel_path, config.code.ignore):
+            continue
+
+        try:
+            content = path.read_text()
+        except (UnicodeDecodeError, PermissionError):
+            continue
+
+        file_issues = scan_file(
+            rel_path, content, config,
+            project_dir=directory,
+            use_llm=use_llm,
+        )
+        all_issues.extend(file_issues)
+
+    return sorted(all_issues, key=lambda i: (
+        {"critical": 0, "major": 1, "minor": 2, "info": 3}[i.severity.value],
+        i.location.file if i.location else "",
+        i.location.line if i.location else 0,
+    ))
+
+
+def _should_ignore(file_path: str, ignore_patterns: list[str]) -> bool:
+    """Check if a file should be ignored based on patterns."""
+    from fnmatch import fnmatch
+
+    for pattern in ignore_patterns:
+        if fnmatch(file_path, pattern):
+            return True
+        # Also check if any path component matches
+        if "/" in pattern or pattern.endswith("/"):
+            clean = pattern.rstrip("/")
+            if clean in file_path:
+                return True
+    return False
+
+
+def _filter_by_strictness(issues: list[Issue], strictness: str) -> list[Issue]:
+    """Filter issues based on strictness level."""
+    thresholds = {
+        "low": {Severity.CRITICAL},
+        "medium": {Severity.CRITICAL, Severity.MAJOR},
+        "high": {Severity.CRITICAL, Severity.MAJOR, Severity.MINOR, Severity.INFO},
+    }
+    allowed = thresholds.get(strictness, thresholds["medium"])
+    return [i for i in issues if i.severity in allowed]
+
+
+def _deduplicate(issues: list[Issue]) -> list[Issue]:
+    """Remove duplicate issues (same file, line, rule)."""
+    seen: set[str] = set()
+    unique: list[Issue] = []
+    for issue in issues:
+        key = f"{issue.location.file if issue.location else ''}:{issue.location.line if issue.location else 0}:{issue.rule_id or issue.title}"
+        if key not in seen:
+            seen.add(key)
+            unique.append(issue)
+    return unique

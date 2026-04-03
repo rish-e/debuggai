@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "debuggai"
+version = "0.1.0"
+description = "The universal verification layer for AI-generated software"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    { name = "Rishi Kolisetty" },
+]
+keywords = ["ai", "testing", "qa", "debugging", "code-quality", "ai-generated-code"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+
+dependencies = [
+    "click>=8.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "rich>=13.0",
+    "anthropic>=0.40.0",
+    "tree-sitter>=0.24.0",
+    "tree-sitter-python>=0.23.0",
+    "tree-sitter-javascript>=0.23.0",
+    "tree-sitter-typescript>=0.23.0",
+    "gitpython>=3.1",
+]
+
+[project.optional-dependencies]
+creative = [
+    "ffmpeg-quality-metrics>=3.0",
+    "librosa>=0.10.0",
+    "moviepy>=1.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "ruff>=0.4.0",
+]
+all = ["debuggai[creative,dev]"]
+
+[project.scripts]
+debuggai = "debuggai.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/debuggai/debuggai"
+Repository = "https://github.com/debuggai/debuggai"
+Issues = "https://github.com/debuggai/debuggai/issues"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
