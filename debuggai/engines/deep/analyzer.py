@@ -334,19 +334,29 @@ def _check_memory_leaks(index: ProjectIndex) -> list[Issue]:
         lines = content.split("\n")
 
         # 1. addEventListener without removeEventListener
-        add_listeners: list[tuple[int, str]] = []
-        remove_listeners: set[str] = set()
+        # Track (event_type, handler_name) pairs for accuracy
+        add_listeners: list[tuple[int, str, str]] = []  # (line, event, handler)
+        remove_pairs: set[tuple[str, str]] = set()  # (event, handler)
 
         for i, line in enumerate(lines, 1):
-            add_match = re.search(r'addEventListener\s*\(\s*[\'"](\w+)[\'"]', line)
+            add_match = re.search(r'addEventListener\s*\(\s*[\'"](\w+)[\'"]\s*,\s*(\w+)', line)
             if add_match:
-                add_listeners.append((i, add_match.group(1)))
-            rem_match = re.search(r'removeEventListener\s*\(\s*[\'"](\w+)[\'"]', line)
-            if rem_match:
-                remove_listeners.add(rem_match.group(1))
+                add_listeners.append((i, add_match.group(1), add_match.group(2)))
+            elif re.search(r'addEventListener\s*\(\s*[\'"](\w+)[\'"]', line):
+                # Anonymous handler — always a leak candidate
+                m = re.search(r'addEventListener\s*\(\s*[\'"](\w+)[\'"]', line)
+                add_listeners.append((i, m.group(1), "<anonymous>"))
 
-        for line_num, event_type in add_listeners:
-            if event_type not in remove_listeners:
+            rem_match = re.search(r'removeEventListener\s*\(\s*[\'"](\w+)[\'"]\s*,\s*(\w+)', line)
+            if rem_match:
+                remove_pairs.add((rem_match.group(1), rem_match.group(2)))
+
+        for line_num, event_type, handler in add_listeners:
+            if (event_type, handler) not in remove_pairs and handler != "<anonymous>":
+                # Check if ANY removal exists for this event (weaker match)
+                if any(evt == event_type for evt, _ in remove_pairs):
+                    continue  # Different handler removed for same event — likely OK
+            if handler == "<anonymous>" or (event_type, handler) not in remove_pairs:
                 issues.append(Issue(
                     id=f"deep-event-leak-{f.path}:{line_num}",
                     severity=Severity.MAJOR,

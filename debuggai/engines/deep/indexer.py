@@ -7,6 +7,7 @@ an architecture summary via LLM.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -227,7 +228,7 @@ Write:
 7. Potential architectural concerns (1-3 bullet points)"""
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=os.environ.get("DEBUGGAI_MODEL", "claude-sonnet-4-20250514"),
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )

@@ -89,8 +89,14 @@ def scan_with_rules(
         if not pattern and not regex:
             continue
 
-        # Compile regex
+        # Compile regex with safety checks
         if regex:
+            # Reject patterns likely to cause catastrophic backtracking
+            if len(regex) > 500:
+                continue
+            dangerous_patterns = ["(.*)*", "(.+)+", "(a+)+", "(a*)*"]
+            if any(dp in regex for dp in dangerous_patterns):
+                continue
             try:
                 compiled = re.compile(regex)
             except re.error:

@@ -7,6 +7,7 @@ and reasons about system-level issues that file-by-file scanning misses.
 from __future__ import annotations
 
 import json
+import os
 from typing import Optional
 
 from debuggai.engines.deep.indexer import ProjectIndex
@@ -77,7 +78,7 @@ Full project context:
 Return ONLY a JSON array of issues."""
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=os.environ.get("DEBUGGAI_MODEL", "claude-sonnet-4-20250514"),
         max_tokens=8192,
         system=system_prompt,
         messages=[{"role": "user", "content": user_msg}],

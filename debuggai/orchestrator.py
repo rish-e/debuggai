@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import time
+
+logger = logging.getLogger("debuggai")
 from pathlib import Path
 from typing import Optional
 
@@ -141,8 +144,9 @@ def _filter_suppressed(issues: list[Issue], project_dir: Optional[str]) -> list[
                 filtered.append(issue)
         db.close()
         return filtered
-    except Exception:
-        return issues  # If storage fails, return all issues
+    except Exception as e:
+        logger.warning("DebuggAI: Dismissal filter failed (issues shown unfiltered): %s", e)
+        return issues
 
 
 def _save_to_history(report: Report, project_dir: Optional[str]) -> None:
@@ -174,8 +178,8 @@ def _save_to_history(report: Report, project_dir: Optional[str]) -> None:
             for i in report.issues
         ])
         db.close()
-    except Exception:
-        pass  # Don't fail the scan if history save fails
+    except Exception as e:
+        logger.warning("DebuggAI: Failed to save scan history: %s", e)
 
 
 def _run_rules_on_directory(directory: str, rules: list[dict]) -> list[Issue]:

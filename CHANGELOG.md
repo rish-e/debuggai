@@ -5,6 +5,31 @@ All notable changes to DebuggAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-04-05
+
+### Fixed
+
+- **API error handling**: All LLM calls now catch `anthropic.APIError`, `APIConnectionError`, `RateLimitError`, and `AuthenticationError` — scans degrade gracefully instead of crashing
+- **Model parameterization**: Model name configurable via `DEBUGGAI_MODEL` env var (no more hardcoded model that breaks on deprecation)
+- **Race condition in dismissals**: Fixed NULL handling in SQLite UNIQUE constraint, dismissal count tracking now atomic
+- **Silent failures replaced with logging**: Storage, dismissal filtering, and history save now log warnings via Python logging instead of silently swallowing errors
+- **Block comment handling**: Security scanner now correctly skips single-line `/* ... */` block comments
+- **Event listener leak detection**: Tracks (event_type, handler_name) pairs instead of just event types — reduces false positives from shared event names with different handlers
+- **`range(len(x))` detection**: Performance analyzer now correctly identifies `range(len(data))` as data-dependent iteration (O(n²) risk)
+- **Docstring/triple-quote skipping**: Security scanner skips lines containing `"""` or `'''` to avoid self-detecting patterns in docstrings
+
+### Added
+
+- **Parallel file scanning**: `ThreadPoolExecutor` scans up to 8 files concurrently
+- **Incremental caching**: File hashes cached in `.debuggai/cache.json` — unchanged files are skipped on re-scan
+- **MCP path validation**: Target paths validated to prevent scanning arbitrary directories
+- **Regex safety**: Custom YAML rules reject patterns over 500 chars or with known catastrophic backtracking patterns
+- **33 unit tests**: Security scanner, import detector, performance analyzer, storage layer, and context detection all tested
+
+### Changed
+
+- Quality delta uses scan ID ordering (not timestamp) to handle same-second scans correctly
+
 ## [2.0.0] - 2026-04-03
 
 ### Added

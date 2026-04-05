@@ -73,11 +73,14 @@ def _is_data_iteration(node: ast.For | ast.AsyncFor) -> bool:
     if isinstance(node.iter, ast.Call):
         func = node.iter.func
         if isinstance(func, ast.Name) and func.id == "range":
-            # range(10) is fine, range(len(x)) is not
             if node.iter.args:
                 arg = node.iter.args[0]
+                # range(10) — small constant, not data-dependent
                 if isinstance(arg, ast.Constant) and isinstance(arg.value, int) and arg.value <= 20:
                     return False
+                # range(len(x)) — data-dependent, IS a data iteration
+                if isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == "len":
+                    return True
     return True
 
 

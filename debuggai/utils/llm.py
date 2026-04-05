@@ -3,11 +3,23 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 from typing import Any, Optional
 
 import anthropic
 
+logger = logging.getLogger("debuggai")
+
 _client: Optional[anthropic.Anthropic] = None
+
+# Model can be overridden via env var
+DEFAULT_MODEL = "claude-sonnet-4-20250514"
+
+
+def get_model() -> str:
+    """Get the model to use, allowing env var override."""
+    return os.environ.get("DEBUGGAI_MODEL", DEFAULT_MODEL)
 
 
 def get_client(api_key: Optional[str] = None) -> anthropic.Anthropic:
@@ -18,17 +30,44 @@ def get_client(api_key: Optional[str] = None) -> anthropic.Anthropic:
     return _client
 
 
+def _parse_json_response(text: str) -> Any:
+    """Extract JSON from an LLM response, handling markdown code blocks."""
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0]
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0]
+    return json.loads(text.strip())
+
+
+def _safe_llm_call(func):
+    """Decorator that catches API errors and returns graceful fallback."""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except anthropic.APIConnectionError as e:
+            logger.warning("DebuggAI: Cannot connect to Anthropic API: %s", e)
+            return kwargs.get("fallback", func.__defaults__[-1] if func.__defaults__ else None)
+        except anthropic.RateLimitError:
+            logger.warning("DebuggAI: Anthropic API rate limit hit. Skipping LLM analysis.")
+            return kwargs.get("fallback", None)
+        except anthropic.APIStatusError as e:
+            logger.warning("DebuggAI: Anthropic API error (status %s): %s", e.status_code, e.message)
+            return kwargs.get("fallback", None)
+    return wrapper
+
+
 def analyze_code(
     code: str,
     context: str = "",
     analysis_type: str = "general",
     api_key: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Send code to Claude for AI-specific analysis.
-
-    Returns structured analysis results.
-    """
-    client = get_client(api_key)
+    """Send code to Claude for AI-specific analysis."""
+    try:
+        client = get_client(api_key)
+    except anthropic.AuthenticationError:
+        logger.warning("DebuggAI: Invalid Anthropic API key. Skipping LLM review.")
+        return {"issues": []}
 
     system_prompt = """You are DebuggAI, an expert code analyzer specializing in detecting bugs
 in AI-generated code. You focus on issues that AI coding tools commonly introduce:
@@ -66,25 +105,20 @@ Code to analyze:
 
 Return ONLY a JSON array of issues found. Return [] if no issues."""
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=4096,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_msg}],
-    )
-
-    # Extract JSON from response
-    text = response.content[0].text
-    # Try to find JSON array in the response
     try:
-        # Handle markdown code blocks
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-        return {"issues": json.loads(text.strip())}
+        response = client.messages.create(
+            model=get_model(),
+            max_tokens=4096,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        text = response.content[0].text
+        return {"issues": _parse_json_response(text)}
+    except (anthropic.APIError, anthropic.APIConnectionError) as e:
+        logger.warning("DebuggAI: LLM analysis failed: %s", e)
+        return {"issues": []}
     except (json.JSONDecodeError, IndexError):
-        return {"issues": [], "raw_response": text}
+        return {"issues": []}
 
 
 def extract_intent_assertions(
@@ -93,7 +127,11 @@ def extract_intent_assertions(
     api_key: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Extract testable assertions from a natural language intent."""
-    client = get_client(api_key)
+    try:
+        client = get_client(api_key)
+    except anthropic.AuthenticationError:
+        logger.warning("DebuggAI: Invalid API key. Skipping intent extraction.")
+        return []
 
     system_prompt = """You are DebuggAI's intent parser. Given a natural language description of
 what code should do, extract specific, testable assertions.
@@ -116,20 +154,17 @@ Intent: "{intent}"
 
 Return ONLY a JSON array of assertions."""
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2048,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_msg}],
-    )
-
-    text = response.content[0].text
     try:
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-        return json.loads(text.strip())
+        response = client.messages.create(
+            model=get_model(),
+            max_tokens=2048,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        return _parse_json_response(response.content[0].text)
+    except (anthropic.APIError, anthropic.APIConnectionError) as e:
+        logger.warning("DebuggAI: Intent extraction failed: %s", e)
+        return []
     except (json.JSONDecodeError, IndexError):
         return []
 
@@ -140,7 +175,10 @@ def verify_assertion(
     api_key: Optional[str] = None,
 ) -> dict[str, Any]:
     """Verify a single assertion against code."""
-    client = get_client(api_key)
+    try:
+        client = get_client(api_key)
+    except anthropic.AuthenticationError:
+        return {"status": "unknown", "evidence": "Invalid API key", "score": 0.0}
 
     system_prompt = """You are DebuggAI's assertion verifier. Given an assertion about what code
 should contain/do, and the actual code, determine if the assertion is satisfied.
@@ -167,19 +205,16 @@ Code:
 
 Return ONLY a JSON object with status, evidence, location, score."""
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1024,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_msg}],
-    )
-
-    text = response.content[0].text
     try:
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-        return json.loads(text.strip())
+        response = client.messages.create(
+            model=get_model(),
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        return _parse_json_response(response.content[0].text)
+    except (anthropic.APIError, anthropic.APIConnectionError) as e:
+        logger.warning("DebuggAI: Assertion verification failed: %s", e)
+        return {"status": "unknown", "evidence": str(e), "score": 0.0}
     except (json.JSONDecodeError, IndexError):
         return {"status": "unknown", "evidence": "Could not parse response", "score": 0.0}

@@ -67,7 +67,8 @@ def _ensure_schema(db: sqlite3.Connection) -> None:
             file_pattern TEXT,
             reason TEXT,
             count INTEGER DEFAULT 1,
-            auto_suppress INTEGER DEFAULT 0
+            auto_suppress INTEGER DEFAULT 0,
+            UNIQUE(rule_id, file_pattern)
         );
 
         CREATE INDEX IF NOT EXISTS idx_scans_timestamp ON scans(timestamp);
@@ -127,7 +128,7 @@ def get_scan_history(db: sqlite3.Connection, project: Optional[str] = None,
 def get_quality_delta(db: sqlite3.Connection, project: str) -> Optional[dict]:
     """Compare latest scan with previous scan to show delta."""
     rows = db.execute("""
-        SELECT * FROM scans WHERE project = ? ORDER BY timestamp DESC LIMIT 2
+        SELECT * FROM scans WHERE project = ? ORDER BY id DESC LIMIT 2
     """, (project,)).fetchall()
 
     if len(rows) < 2:
@@ -174,35 +175,35 @@ def dismiss_issue(db: sqlite3.Connection, rule_id: str,
                   file_pattern: Optional[str] = None,
                   reason: str = "") -> None:
     """Record a dismissal. Auto-suppresses after 3 dismissals."""
-    existing = db.execute("""
-        SELECT id, count FROM dismissals WHERE rule_id = ? AND file_pattern IS ?
-    """, (rule_id, file_pattern)).fetchone()
+    # Use explicit SELECT+UPDATE to handle NULL file_pattern correctly
+    # (SQLite UNIQUE treats each NULL as distinct)
+    existing = db.execute(
+        "SELECT id, count FROM dismissals WHERE rule_id = ? AND COALESCE(file_pattern, '') = COALESCE(?, '')",
+        (rule_id, file_pattern),
+    ).fetchone()
 
     if existing:
         new_count = existing["count"] + 1
         auto_suppress = 1 if new_count >= 3 else 0
-        db.execute("""
-            UPDATE dismissals SET count = ?, auto_suppress = ?,
-                   timestamp = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
-                   reason = COALESCE(?, reason)
-            WHERE id = ?
-        """, (new_count, auto_suppress, reason or None, existing["id"]))
+        db.execute(
+            "UPDATE dismissals SET count = ?, auto_suppress = ?, timestamp = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?",
+            (new_count, auto_suppress, existing["id"]),
+        )
     else:
-        db.execute("""
-            INSERT INTO dismissals (rule_id, file_pattern, reason)
-            VALUES (?, ?, ?)
-        """, (rule_id, file_pattern, reason))
-
+        db.execute(
+            "INSERT INTO dismissals (rule_id, file_pattern, reason) VALUES (?, ?, ?)",
+            (rule_id, file_pattern, reason or ""),
+        )
     db.commit()
 
 
 def is_suppressed(db: sqlite3.Connection, rule_id: str,
                   file_path: Optional[str] = None) -> bool:
     """Check if an issue should be auto-suppressed based on dismissal history."""
-    # Check exact rule + file match
     row = db.execute("""
         SELECT auto_suppress FROM dismissals
-        WHERE rule_id = ? AND (file_pattern IS NULL OR ? LIKE '%' || file_pattern || '%')
+        WHERE rule_id = ?
+        AND (COALESCE(file_pattern, '') = '' OR ? LIKE '%' || file_pattern || '%')
         AND auto_suppress = 1
     """, (rule_id, file_path or "")).fetchone()
 

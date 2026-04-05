@@ -421,7 +421,8 @@ debuggai/
 
 - **v0.1** — Code QA + Intent Verification + CLI + MCP Server
 - **v1.0** — Auto-fix, framework detection, dismissal memory, scan history, custom YAML rules
-- **v2.0** (current) — Deep Analysis Engine, architectural anti-patterns, runtime behavior analysis, domain rule packs
+- **v2.1** (current) — Hardened: parallel scanning, incremental caching, 33 tests, API error handling, false positive fixes
+- **v2.0** — Deep Analysis Engine, architectural anti-patterns, runtime behavior analysis, domain rule packs
 - **v2.5** — Cloud dashboard, team features, GitHub PR integration (GitHub App), quality gates
 - **v3.0** — Autonomous testing agent (Playwright + LLM), self-healing tests
 

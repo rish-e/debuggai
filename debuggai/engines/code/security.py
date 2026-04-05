@@ -155,16 +155,31 @@ def scan_security(file_path: str, content: str) -> list[Issue]:
     elif ext in {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}:
         patterns.extend(JS_TS_PATTERNS)
 
+    in_block_comment = False
     for line_num, line in enumerate(lines, 1):
-        # Skip comments
         stripped = line.strip()
+
+        # Track block comments (/* ... */)
+        if "/*" in stripped:
+            if "*/" not in stripped:
+                in_block_comment = True
+            continue  # Skip both single-line and multi-line block comments
+        if in_block_comment:
+            if "*/" in stripped:
+                in_block_comment = False
+            continue
+
+        # Skip single-line comments
         if stripped.startswith("#") or stripped.startswith("//") or stripped.startswith("*"):
             continue
-        # Skip lines that are regex/pattern definitions or string literals (avoid self-detection)
+        # Skip lines that are regex/pattern definitions (avoid self-detection)
         if "re.compile" in stripped or "Pattern" in stripped:
             continue
         # Skip lines that are just string literals (descriptions, error messages)
         if stripped.startswith('"') or stripped.startswith("'") or stripped.startswith('"""') or stripped.startswith("f'"):
+            continue
+        # Skip triple-quoted docstrings
+        if '"""' in stripped or "'''" in stripped:
             continue
 
         for pattern, severity, title, desc, suggestion, rule_id in patterns:

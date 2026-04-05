@@ -128,10 +128,15 @@ def scan_directory(
     config: DebuggAIConfig,
     use_llm: bool = True,
 ) -> list[Issue]:
-    """Scan all supported files in a directory."""
-    all_issues: list[Issue] = []
-    root = Path(directory)
+    """Scan all supported files in a directory. Uses parallel execution for speed."""
+    import hashlib
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
+    root = Path(directory)
+    cache = _load_cache(directory)
+
+    # Collect files to scan
+    files_to_scan: list[tuple[str, str, str]] = []  # (rel_path, content, file_hash)
     for path in sorted(root.rglob("*")):
         if not path.is_file():
             continue
@@ -148,18 +153,68 @@ def scan_directory(
         except (UnicodeDecodeError, PermissionError):
             continue
 
-        file_issues = scan_file(
+        # Incremental: skip if file hasn't changed
+        file_hash = hashlib.md5(content.encode()).hexdigest()
+        if rel_path in cache and cache[rel_path] == file_hash:
+            continue
+
+        files_to_scan.append((rel_path, content, file_hash))
+
+    # Scan in parallel (LLM calls are IO-bound, pattern matching is CPU-bound)
+    all_issues: list[Issue] = []
+    new_cache: dict[str, str] = dict(cache)
+
+    def _scan_one(args: tuple[str, str, str]) -> tuple[list[Issue], str, str]:
+        rel_path, content, file_hash = args
+        issues = scan_file(
             rel_path, content, config,
             project_dir=directory,
             use_llm=use_llm,
         )
-        all_issues.extend(file_issues)
+        return issues, rel_path, file_hash
+
+    # Use ThreadPoolExecutor for parallel scanning (up to 8 workers)
+    max_workers = min(8, len(files_to_scan)) if files_to_scan else 1
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_scan_one, f): f for f in files_to_scan}
+        for future in as_completed(futures):
+            try:
+                issues, rel_path, file_hash = future.result()
+                all_issues.extend(issues)
+                new_cache[rel_path] = file_hash
+            except Exception:
+                pass  # Individual file failures don't stop the scan
+
+    _save_cache(directory, new_cache)
 
     return sorted(all_issues, key=lambda i: (
         {"critical": 0, "major": 1, "minor": 2, "info": 3}[i.severity.value],
         i.location.file if i.location else "",
         i.location.line if i.location else 0,
     ))
+
+
+def _load_cache(directory: str) -> dict[str, str]:
+    """Load file hash cache for incremental scanning."""
+    import json
+    cache_path = Path(directory) / ".debuggai" / "cache.json"
+    if cache_path.exists():
+        try:
+            return json.loads(cache_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def _save_cache(directory: str, cache: dict[str, str]) -> None:
+    """Save file hash cache."""
+    import json
+    cache_dir = Path(directory) / ".debuggai"
+    cache_dir.mkdir(exist_ok=True)
+    try:
+        (cache_dir / "cache.json").write_text(json.dumps(cache))
+    except OSError:
+        pass
 
 
 def _should_ignore(file_path: str, ignore_patterns: list[str]) -> bool:

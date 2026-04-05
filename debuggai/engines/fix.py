@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -42,7 +43,7 @@ def generate_fix(
     context = "\n".join(f"{i+1}: {lines[i]}" for i in range(start, end))
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=os.environ.get("DEBUGGAI_MODEL", "claude-sonnet-4-20250514"),
         max_tokens=2048,
         system="""You are DebuggAI's auto-fix engine. Given a code issue and its surrounding context,
 generate a minimal, correct fix. Return ONLY a JSON object with:

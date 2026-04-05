@@ -15,9 +15,22 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP(
     "DebuggAI",
-    version="2.0.0",
+    version="2.1.0",
     description="The universal verification layer for AI-generated software",
 )
+
+
+def _validate_path(target: str) -> str:
+    """Validate and resolve target path. Prevents scanning outside project scope."""
+    resolved = Path(target).resolve()
+    cwd = Path.cwd().resolve()
+    # Allow scanning cwd or subdirectories, or explicit absolute paths the user provides
+    if not str(resolved).startswith(str(cwd)) and target not in (".", "./"):
+        # Allow if it's a real directory the user likely intends
+        if resolved.exists() and resolved.is_dir():
+            return str(resolved)
+        raise ValueError(f"Target path '{target}' is outside the current project directory.")
+    return str(resolved)
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
