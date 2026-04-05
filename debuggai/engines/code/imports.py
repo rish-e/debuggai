@@ -185,6 +185,9 @@ def _is_hallucinated_js(package: str, installed: set[str]) -> bool:
     """Check if a JS/TS package is hallucinated."""
     if package in NODE_BUILTINS or package.startswith("node:"):
         return False
+    # Skip path aliases (@/, ~/, #/) — these are resolved by bundler/tsconfig, not npm
+    if package.startswith("@/") or package.startswith("~/") or package.startswith("#/"):
+        return False
     if package in installed:
         return False
     # Common aliases/built-in patterns
