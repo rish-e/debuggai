@@ -223,6 +223,45 @@ Traditional linters weren't designed for AI-generated code. They miss what AI sp
 
 ---
 
+## Persona Testing (v3.0)
+
+Test your software from the **customer's perspective**, not just the developer's. DebuggAI discovers who your users are, then finds issues they'd encounter.
+
+```bash
+debuggai persona                              # Discover ICPs + analyze
+debuggai persona --discover                   # Just discover personas
+debuggai persona --persona "content creator"  # Test for specific persona
+```
+
+**What it discovers:**
+```
+Personas Discovered — my-app (consumer)
+
+  1. Content Creator (primary) — non-technical
+     Goals: Upload and process content quickly
+     Pain points: Confusing error messages, no progress feedback
+
+  2. Mobile User (secondary) — non-technical
+     Goals: Complete tasks on the go
+     Pain points: Tiny touch targets, slow loading on 4G
+
+  3. First-Time Visitor (tertiary) — non-technical
+     Goals: Understand what this product does in seconds
+     Pain points: No clear value proposition, complex signup
+```
+
+**What it checks per persona:**
+
+| Persona Type | Checks |
+|-------------|--------|
+| Non-technical user | Technical jargon in UI, raw error codes, missing loading feedback |
+| Mobile user | Viewport meta tag, hover-only interactions, large assets |
+| Developer | Missing API docs |
+| Admin | Missing export, missing bulk operations |
+| All personas | Unfriendly error messages, missing loading states, missing empty states |
+
+---
+
 ## Deep Analysis (v2.0)
 
 Go beyond file-by-file scanning. Deep analysis understands your entire project — deployment model, runtime behavior, architectural patterns — and finds system-level bugs that no linter can catch.
@@ -421,7 +460,8 @@ debuggai/
 
 - **v0.1** — Code QA + Intent Verification + CLI + MCP Server
 - **v1.0** — Auto-fix, framework detection, dismissal memory, scan history, custom YAML rules
-- **v2.1** (current) — Hardened: parallel scanning, incremental caching, 33 tests, API error handling, false positive fixes
+- **v3.0** (current) — Persona-Based Testing: ICP discovery, customer-perspective analysis, per-persona UX checks
+- **v2.1** — Hardened: parallel scanning, incremental caching, 33 tests, API error handling, false positive fixes
 - **v2.0** — Deep Analysis Engine, architectural anti-patterns, runtime behavior analysis, domain rule packs
 - **v2.5** — Cloud dashboard, team features, GitHub PR integration (GitHub App), quality gates
 - **v3.0** — Autonomous testing agent (Playwright + LLM), self-healing tests

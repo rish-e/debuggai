@@ -15,7 +15,7 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP(
     "DebuggAI",
-    version="2.1.0",
+    version="3.0.0",
     description="The universal verification layer for AI-generated software",
 )
 
@@ -290,6 +290,69 @@ def deep_analysis(
     return result
 
 
+@mcp.tool()
+def discover_personas(target: str = ".") -> str:
+    """Discover who uses this software. Identifies ICPs (Ideal Customer Personas) from the codebase.
+
+    Reads README, UI patterns, features, and config to infer target personas.
+
+    Args:
+        target: Project directory to analyze
+    """
+    from debuggai.engines.persona.engine import run_persona_analysis
+
+    project_dir = str(Path(target).resolve()) if target != "." else None
+    profile, _ = run_persona_analysis(project_dir=project_dir, discover_only=True)
+
+    result = f"## Personas for {profile.project_name} ({profile.app_type})\n\n"
+    for i, p in enumerate(profile.personas, 1):
+        result += f"### {i}. {p.name} ({p.role})\n"
+        result += f"**Tech level:** {p.tech_level}\n"
+        result += f"{p.description}\n"
+        if p.goals:
+            result += f"**Goals:** {', '.join(p.goals)}\n"
+        if p.pain_points:
+            result += f"**Pain points:** {', '.join(p.pain_points)}\n"
+        if p.key_flows:
+            result += f"**Key flows:** {', '.join(p.key_flows)}\n"
+        result += "\n"
+
+    return result
+
+
+@mcp.tool()
+def persona_test(
+    target: str = ".",
+    persona_name: str | None = None,
+) -> str:
+    """Test software from the customer's perspective. Finds UX issues specific to each persona.
+
+    Discovers who uses this software, then checks for persona-specific problems:
+    technical jargon in UI, missing loading states, mobile issues, accessibility gaps, etc.
+
+    Args:
+        target: Project directory to analyze
+        persona_name: Specific persona to test for (or all if not specified)
+    """
+    from debuggai.engines.persona.engine import run_persona_analysis
+    from debuggai.reports.generator import format_markdown
+
+    project_dir = str(Path(target).resolve()) if target != "." else None
+    profile, report = run_persona_analysis(
+        project_dir=project_dir,
+        persona_name=persona_name,
+    )
+
+    result = f"## Persona Test — {profile.project_name}\n\n"
+    result += f"**App type:** {profile.app_type}\n"
+    result += f"**Personas tested:** {', '.join(p.name for p in profile.personas)}\n\n"
+
+    if report:
+        result += format_markdown(report)
+
+    return result
+
+
 # ─── Prompts (slash commands) ─────────────────────────────────────────────────
 
 
@@ -352,6 +415,18 @@ def deep(target: str = ".", focus: str = "all") -> str:
         "Present the architecture summary first, then group findings by category "
         "(architectural, runtime, domain-specific). For each finding, explain the "
         "causal chain — why it's a bug, what happens at runtime, and how to fix it."
+    )
+
+
+@mcp.prompt()
+def persona(target: str = ".") -> str:
+    """Test your software from the customer's perspective. Discovers who uses it and finds UX issues they'd encounter."""
+    return (
+        f'First run the discover_personas tool with target="{target}" to identify who uses this software. '
+        "Present each persona clearly with their goals, pain points, and key flows. "
+        f'Then run the persona_test tool with target="{target}" to find UX issues. '
+        "Group findings by persona. For each finding, explain why THIS persona would be affected "
+        "and what the impact is from THEIR perspective — not a developer's."
     )
 
 

@@ -411,6 +411,56 @@ def deep(directory: str, focus: str, no_llm: bool, output_format: str):
 
 
 @main.command()
+@click.argument("directory", default=".")
+@click.option("--discover", is_flag=True, help="Only discover personas, don't analyze")
+@click.option("--persona", "-p", "persona_name", help="Test for a specific persona")
+@click.option("--format", "-o", "output_format", type=click.Choice(["terminal", "markdown", "json"]), default="terminal")
+def persona(directory: str, discover: bool, persona_name: str | None, output_format: str):
+    """Test your software from the customer's perspective. Discovers ICPs and finds UX issues."""
+    from debuggai.engines.persona.engine import run_persona_analysis
+    from debuggai.reports.generator import format_json, format_markdown, format_terminal
+
+    project_dir = str(Path(directory).resolve())
+
+    with console.status("[bold blue]Discovering personas...[/bold blue]"):
+        profile, report = run_persona_analysis(
+            project_dir=project_dir,
+            persona_name=persona_name,
+            discover_only=discover,
+        )
+
+    # Show discovered personas
+    console.print(f"\n[bold]Personas Discovered[/bold] — {profile.project_name} ({profile.app_type})\n")
+    for i, p in enumerate(profile.personas, 1):
+        role_color = {"primary": "green", "secondary": "yellow", "tertiary": "dim"}.get(p.role, "dim")
+        console.print(f"  {i}. [bold]{p.name}[/bold] [{role_color}]{p.role}[/{role_color}] ({p.tech_level})")
+        console.print(f"     {p.description}")
+        if p.goals:
+            console.print(f"     Goals: {', '.join(p.goals[:3])}")
+        if p.pain_points:
+            console.print(f"     Pain points: {', '.join(p.pain_points[:3])}")
+        if p.key_flows:
+            console.print(f"     Key flows: {', '.join(p.key_flows[:4])}")
+        console.print()
+
+    if discover or report is None:
+        return
+
+    # Show analysis results
+    if output_format == "json":
+        click.echo(format_json(report))
+    elif output_format == "markdown":
+        click.echo(format_markdown(report))
+    else:
+        console.print(format_terminal(report))
+
+    if report.summary.critical > 0:
+        sys.exit(2)
+    elif report.summary.major > 0:
+        sys.exit(1)
+
+
+@main.command()
 def serve():
     """Start the DebuggAI MCP server (used internally by Claude Code / Cursor)."""
     from debuggai.mcp_server import main as mcp_main

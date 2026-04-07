@@ -5,6 +5,30 @@ All notable changes to DebuggAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-04-07
+
+### Added
+
+- **Persona-Based Testing** — test software from the customer's perspective, not just the developer's
+  - `debuggai persona` command discovers ICPs and finds persona-specific issues
+  - `discover_personas` MCP tool identifies who uses the software from codebase signals
+  - `persona_test` MCP tool finds UX issues specific to each persona
+  - `/persona` slash command for Claude Code
+  - **ICP Discovery Engine**: Reads README, UI patterns, features, config to infer target personas
+    - Detects app type (consumer, b2b, developer-tool)
+    - Infers 2-4 personas with goals, pain points, devices, and key flows
+    - Signal-based heuristics (free) + optional LLM-powered discovery (deeper)
+  - **Persona Static Analyzer**: Checks code for persona-specific issues
+    - Non-technical users: technical jargon in UI, raw error codes shown to users
+    - Mobile users: missing viewport meta, hover-only interactions, large assets
+    - Developer users: missing API documentation
+    - Admin users: missing export functionality
+    - All personas: unfriendly error messages, missing loading states, missing empty states
+  - Works on any project — auto-adapts to the codebase (tested on video editors, admin dashboards, CLI tools)
+- **False positive fix**: `@/` path aliases (Next.js/TypeScript) no longer flagged as hallucinated imports
+- **False positive fix**: SQLite `.execute().fetchone()` no longer flagged as HTTP call
+- **False positive fix**: SQL arithmetic inside strings (`value + 1`) no longer flagged as injection
+
 ## [2.1.0] - 2026-04-05
 
 ### Fixed
