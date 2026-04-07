@@ -260,6 +260,43 @@ Personas Discovered — my-app (consumer)
 | Admin | Missing export, missing bulk operations |
 | All personas | Unfriendly error messages, missing loading states, missing empty states |
 
+### Live Browser Testing
+
+The agent opens a **real browser**, navigates your site as the persona, and reports what the experience was like — step by step.
+
+```bash
+pip install debuggai[live]        # Install Playwright
+playwright install chromium       # Download browser
+
+debuggai persona --live http://localhost:3000
+debuggai persona --live https://mysite.com --persona "first-time visitor"
+```
+
+```
+DebuggAI Experience Report
+Persona: First-Time Content Creator — non-technical
+Goal: Upload and edit a video
+Experience Score: 42/100
+
+  Step 1: Landing page .......................... smooth
+    "Clean page with clear title."
+
+  Step 2: Looking for upload .................... confused
+    "Upload button is below the fold. Almost gave up."
+    FRICTION: Primary CTA not visible without scrolling.
+
+  Step 3: Processing ............................ frustrated
+    "Spinner with no ETA. Thought it was broken after 30s."
+    FRICTION: No time estimate. No 'don't close' warning.
+
+Top Improvements:
+  1. Move upload button above the fold
+  2. Add processing ETA
+  3. Label export formats with use cases
+```
+
+Requires `ANTHROPIC_API_KEY` for Claude Vision evaluation. Cost: ~$0.03-0.09 per persona run.
+
 ---
 
 ## Deep Analysis (v2.0)
@@ -460,7 +497,8 @@ debuggai/
 
 - **v0.1** — Code QA + Intent Verification + CLI + MCP Server
 - **v1.0** — Auto-fix, framework detection, dismissal memory, scan history, custom YAML rules
-- **v3.0** (current) — Persona-Based Testing: ICP discovery, customer-perspective analysis, per-persona UX checks
+- **v3.1** (current) — Live Browser Agent: Playwright opens your site, navigates as a persona, reports the experience
+- **v3.0** — Persona-Based Testing: ICP discovery, customer-perspective analysis, per-persona UX checks
 - **v2.1** — Hardened: parallel scanning, incremental caching, 33 tests, API error handling, false positive fixes
 - **v2.0** — Deep Analysis Engine, architectural anti-patterns, runtime behavior analysis, domain rule packs
 - **v2.5** — Cloud dashboard, team features, GitHub PR integration (GitHub App), quality gates

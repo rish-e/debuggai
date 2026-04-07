@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "debuggai"
-version = "3.0.0"
+version = "3.1.0"
 description = "The universal verification layer for AI-generated software"
 readme = "README.md"
 license = "Apache-2.0"
@@ -41,6 +41,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+live = [
+    "playwright>=1.40.0",
+]
 creative = [
     "ffmpeg-quality-metrics>=3.0",
     "librosa>=0.10.0",

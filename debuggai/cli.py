@@ -414,14 +414,57 @@ def deep(directory: str, focus: str, no_llm: bool, output_format: str):
 @click.argument("directory", default=".")
 @click.option("--discover", is_flag=True, help="Only discover personas, don't analyze")
 @click.option("--persona", "-p", "persona_name", help="Test for a specific persona")
+@click.option("--live", "-l", "live_url", help="URL to test live (opens browser, navigates as persona)")
 @click.option("--format", "-o", "output_format", type=click.Choice(["terminal", "markdown", "json"]), default="terminal")
-def persona(directory: str, discover: bool, persona_name: str | None, output_format: str):
-    """Test your software from the customer's perspective. Discovers ICPs and finds UX issues."""
+def persona(directory: str, discover: bool, persona_name: str | None, live_url: str | None, output_format: str):
+    """Test your software from the customer's perspective. Discovers ICPs and finds UX issues.
+
+    Static mode (default): analyzes code for persona-specific issues.
+    Live mode (--live URL): opens a browser, navigates as the persona, reports the experience.
+    """
     from debuggai.engines.persona.engine import run_persona_analysis
-    from debuggai.reports.generator import format_json, format_markdown, format_terminal
 
     project_dir = str(Path(directory).resolve())
 
+    # Live mode — browser agent
+    if live_url:
+        from debuggai.engines.persona.engine import run_live_persona_test
+
+        console.print(f"[bold blue]Live Persona Test[/bold blue] — {live_url}")
+        console.print(f"[dim]Opening browser and navigating as persona...[/dim]\n")
+
+        try:
+            profile, experience_reports = run_live_persona_test(
+                url=live_url,
+                project_dir=project_dir,
+                persona_name=persona_name,
+            )
+        except RuntimeError as e:
+            console.print(f"[red]{e}[/red]")
+            sys.exit(1)
+
+        # Show personas
+        console.print(f"[bold]Personas[/bold] — {profile.project_name}\n")
+        for p in profile.personas:
+            console.print(f"  [bold]{p.name}[/bold] ({p.tech_level}) — {p.description}")
+        console.print()
+
+        # Show experience reports
+        for report in experience_reports:
+            if output_format == "markdown":
+                click.echo(report.format_markdown())
+            else:
+                console.print(report.format_terminal())
+
+        # Exit code based on worst experience
+        worst = min((r.experience_score for r in experience_reports), default=100)
+        if worst < 30:
+            sys.exit(2)
+        elif worst < 60:
+            sys.exit(1)
+        return
+
+    # Static mode
     with console.status("[bold blue]Discovering personas...[/bold blue]"):
         profile, report = run_persona_analysis(
             project_dir=project_dir,

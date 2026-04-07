@@ -15,7 +15,7 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP(
     "DebuggAI",
-    version="3.0.0",
+    version="3.1.0",
     description="The universal verification layer for AI-generated software",
 )
 
@@ -349,6 +349,43 @@ def persona_test(
 
     if report:
         result += format_markdown(report)
+
+    return result
+
+
+@mcp.tool()
+def live_persona_test(
+    url: str,
+    target: str = ".",
+    persona_name: str | None = None,
+) -> str:
+    """Test a live website from the customer's perspective. Opens a real browser, navigates as the persona, and reports the experience.
+
+    The agent role-plays as a specific user persona, evaluating each page for clarity,
+    friction, and usability — not just whether buttons work, but whether the EXPERIENCE
+    makes sense for that type of user.
+
+    Args:
+        url: The URL to test (e.g., http://localhost:3000 or https://mysite.com)
+        target: Project directory for persona discovery (defaults to cwd)
+        persona_name: Specific persona to test as (or discovers from codebase if not specified)
+    """
+    from debuggai.engines.persona.engine import run_live_persona_test
+
+    try:
+        project_dir = str(Path(target).resolve()) if target != "." else None
+        profile, reports = run_live_persona_test(
+            url=url, project_dir=project_dir, persona_name=persona_name,
+        )
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    result = f"## Live Experience Test — {url}\n\n"
+    result += f"**Personas tested:** {', '.join(p.name for p in profile.personas)}\n\n"
+
+    for report in reports:
+        result += report.format_markdown()
+        result += "\n---\n\n"
 
     return result
 

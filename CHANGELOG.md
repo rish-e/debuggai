@@ -5,6 +5,25 @@ All notable changes to DebuggAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-04-07
+
+### Added
+
+- **Live Persona Browser Agent** — opens a real browser, navigates your website AS a specific persona
+  - `debuggai persona --live http://localhost:3000` — full experience test
+  - `live_persona_test` MCP tool for Claude Code integration
+  - Uses Playwright + Claude Vision: screenshot → evaluate from persona's perspective → decide next action → repeat
+  - Reports step-by-step journey with friction points, feelings (smooth/confused/frustrated/lost), and experience score (0-100)
+  - Smart element finding: tries text match, ARIA roles, placeholders, labels
+  - Configurable max steps (default 15)
+  - Works on localhost and deployed sites
+  - Cost: ~$0.03-0.09 per persona run
+- **Experience Report** — new report format showing the persona's journey through your app
+  - Terminal and Markdown output formats
+  - Per-step: observation, feeling, friction, action taken
+  - Summary: experience score, friction count, top improvements
+- `playwright` added as optional dependency (`pip install debuggai[live]`)
+
 ## [3.0.0] - 2026-04-07
 
 ### Added
