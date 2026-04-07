@@ -59,6 +59,13 @@ def start_session(url: str, persona_name: str, persona_description: str,
     """
     global _active_session
 
+    # Close any existing session first
+    if _active_session:
+        try:
+            end_session()
+        except Exception:
+            _active_session = None
+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -74,13 +81,21 @@ def start_session(url: str, persona_name: str, persona_description: str,
         try:
             await page.goto(url, wait_until="networkidle", timeout=30000)
         except Exception as e:
-            return {"error": f"Failed to load {url}: {e}", "pw": pw, "browser": browser, "page": page}
+            # Clean up on navigation failure
+            await browser.close()
+            await pw.stop()
+            return {"error": f"Failed to load {url}: {e}"}
 
         return {"pw": pw, "browser": browser, "context": context, "page": page}
 
-    result = loop.run_until_complete(_start())
+    try:
+        result = loop.run_until_complete(_start())
+    except Exception as e:
+        loop.close()
+        return {"error": f"Browser launch failed: {e}"}
 
-    if "error" in result and "page" not in result:
+    if "error" in result:
+        loop.close()
         return {"error": result["error"]}
 
     _active_session = {
@@ -312,6 +327,7 @@ def end_session() -> ExperienceReport:
             pass
 
     loop.run_until_complete(_close())
+    loop.close()  # Prevent event loop leak
 
     report = ExperienceReport(
         persona_name=persona["name"],

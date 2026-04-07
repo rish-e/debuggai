@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from debuggai.config import DebuggAIConfig
+from debuggai.utils.constants import SEVERITY_RANK, SKIP_DIRS, SUPPORTED_EXTENSIONS as _SUPPORTED
 from debuggai.engines.code.imports import scan_imports
 from debuggai.engines.code.performance import scan_performance
 from debuggai.engines.code.security import scan_security
@@ -117,7 +118,7 @@ def scan_files(
         all_issues.extend(file_issues)
 
     return sorted(all_issues, key=lambda i: (
-        {"critical": 0, "major": 1, "minor": 2, "info": 3}[i.severity.value],
+        SEVERITY_RANK.get(i.severity.value, 99),
         i.location.file if i.location else "",
         i.location.line if i.location else 0,
     ))
@@ -188,7 +189,7 @@ def scan_directory(
     _save_cache(directory, new_cache)
 
     return sorted(all_issues, key=lambda i: (
-        {"critical": 0, "major": 1, "minor": 2, "info": 3}[i.severity.value],
+        SEVERITY_RANK.get(i.severity.value, 99),
         i.location.file if i.location else "",
         i.location.line if i.location else 0,
     ))

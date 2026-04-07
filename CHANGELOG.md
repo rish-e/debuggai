@@ -5,6 +5,23 @@ All notable changes to DebuggAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-04-07
+
+### Fixed
+
+- **Persona agent session crash**: Navigation failure no longer leaves dangling session; browser cleaned up properly on error
+- **Event loop leak**: `end_session()` now closes the asyncio event loop; prevents resource leaks across multiple sessions
+- **LLM client key mismatch**: Global client now tracks cached API key and recreates if key changes between calls
+- **KeyError in severity sorting**: Replaced 4 hardcoded dict lookups with `.get()` via shared `SEVERITY_RANK` constant
+- **Exit code logic in verify**: Fidelity score thresholds corrected (<40 = exit 2, <70 = exit 1, >=70 = exit 0)
+- **Intent verification crash**: `score_intent()` failure no longer crashes entire scan (wrapped in try/except)
+
+### Improved
+
+- **Package list caching**: `pip list` and `node_modules` traversal now cached per session — was running per-file (100 files = 100 subprocess calls → now 1)
+- **Shared constants**: Severity ranking, language maps, skip directories extracted to `utils/constants.py` — eliminates 12 duplicate definitions
+- **CONTRIBUTING.md**: Updated to reference Python MCP server (removed deleted TypeScript instructions)
+
 ## [3.1.0] - 2026-04-07
 
 ### Added

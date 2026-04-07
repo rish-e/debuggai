@@ -127,8 +127,15 @@ def _is_hallucinated_python(
     return True
 
 
+_cached_python_packages: Optional[set[str]] = None
+_cached_npm_packages: dict[str, set[str]] = {}
+
+
 def _get_installed_python_packages() -> set[str]:
-    """Get set of installed Python packages."""
+    """Get set of installed Python packages. Cached per session."""
+    global _cached_python_packages
+    if _cached_python_packages is not None:
+        return _cached_python_packages
     try:
         result = subprocess.run(
             ["pip", "list", "--format=json"],
@@ -136,14 +143,15 @@ def _get_installed_python_packages() -> set[str]:
         )
         if result.returncode == 0:
             packages = json.loads(result.stdout)
-            # Normalize package names (hyphens → underscores)
-            return {
+            _cached_python_packages = {
                 pkg["name"].lower().replace("-", "_")
                 for pkg in packages
             }
+            return _cached_python_packages
     except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
         pass
-    return set()
+    _cached_python_packages = set()
+    return _cached_python_packages
 
 
 def check_js_imports(file_path: str, content: str, project_dir: Optional[str] = None) -> list[Issue]:
@@ -198,7 +206,11 @@ def _is_hallucinated_js(package: str, installed: set[str]) -> bool:
 
 
 def _get_installed_npm_packages(project_dir: Optional[str] = None) -> set[str]:
-    """Get set of installed npm packages from package.json."""
+    """Get set of installed npm packages from package.json. Cached per project dir."""
+    cache_key = str(project_dir or Path.cwd())
+    if cache_key in _cached_npm_packages:
+        return _cached_npm_packages[cache_key]
+
     packages: set[str] = set()
     search_dir = Path(project_dir) if project_dir else Path.cwd()
 
@@ -226,6 +238,7 @@ def _get_installed_npm_packages(project_dir: Optional[str] = None) -> set[str]:
                 else:
                     packages.add(item.name)
 
+    _cached_npm_packages[cache_key] = packages
     return packages
 
 

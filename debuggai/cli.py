@@ -137,11 +137,11 @@ def verify(
     else:
         console.print(format_terminal(report))
 
-    # Exit based on fidelity score
-    if report.intent and report.intent.fidelity_score < 50:
-        sys.exit(2)
-    elif report.intent and report.intent.fidelity_score < 80:
-        sys.exit(1)
+    # Exit based on fidelity score (lower score = worse match)
+    if report.intent and report.intent.fidelity_score < 40:
+        sys.exit(2)  # Critical: code barely matches intent
+    elif report.intent and report.intent.fidelity_score < 70:
+        sys.exit(1)  # Major: significant gaps
     sys.exit(0)
 
 

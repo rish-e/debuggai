@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 from debuggai.config import load_config
+from debuggai.utils.constants import SEVERITY_RANK
 from debuggai.engines.deep.analyzer import analyze_architecture
 from debuggai.engines.deep.holistic import run_holistic_review
 from debuggai.engines.deep.indexer import (
@@ -108,7 +109,7 @@ def run_deep_analysis(
 
     # Sort by severity
     unique_issues.sort(key=lambda i: (
-        {"critical": 0, "major": 1, "minor": 2, "info": 3}[i.severity.value],
+        SEVERITY_RANK.get(i.severity.value, 99),
         i.location.file if i.location else "",
     ))
 

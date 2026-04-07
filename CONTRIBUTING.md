@@ -10,12 +10,11 @@ cd debuggai
 pip install -e ".[dev]"
 ```
 
-For the MCP server:
+The MCP server is Python-native (no npm required). For live persona testing:
 
 ```bash
-cd mcp-server
-npm install
-npm run build
+pip install -e ".[live]"
+playwright install chromium
 ```
 
 ## Running Tests

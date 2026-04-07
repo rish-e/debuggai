@@ -12,6 +12,7 @@ import anthropic
 logger = logging.getLogger("debuggai")
 
 _client: Optional[anthropic.Anthropic] = None
+_cached_key: Optional[str] = None
 
 # Model can be overridden via env var
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
@@ -23,10 +24,11 @@ def get_model() -> str:
 
 
 def get_client(api_key: Optional[str] = None) -> anthropic.Anthropic:
-    """Get or create the Anthropic client."""
-    global _client
-    if _client is None:
+    """Get or create the Anthropic client. Recreates if key changes."""
+    global _client, _cached_key
+    if _client is None or (api_key and api_key != _cached_key):
         _client = anthropic.Anthropic(api_key=api_key)
+        _cached_key = api_key
     return _client
 
 

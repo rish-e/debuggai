@@ -91,15 +91,18 @@ def run_scan(
             cli_intent=intent, spec_file=spec_file, project_dir=project_dir,
         )
         if intent_text:
-            code_context = _gather_code_context(target, project_dir)
-            intent_spec = parse_intent(
-                intent_text, source, code_context=code_context, api_key=config.anthropic_api_key,
-            )
-            if intent_spec.assertions:
-                intent_spec, intent_issues = score_intent(
-                    intent_spec, code_context, project_dir=project_dir, api_key=config.anthropic_api_key,
+            try:
+                code_context = _gather_code_context(target, project_dir)
+                intent_spec = parse_intent(
+                    intent_text, source, code_context=code_context, api_key=config.anthropic_api_key,
                 )
-                issues.extend(intent_issues)
+                if intent_spec.assertions:
+                    intent_spec, intent_issues = score_intent(
+                        intent_spec, code_context, project_dir=project_dir, api_key=config.anthropic_api_key,
+                    )
+                    issues.extend(intent_issues)
+            except Exception as e:
+                logger.warning("DebuggAI: Intent verification failed: %s", e)
 
     duration_ms = int((time.time() - start) * 1000)
 
